@@ -1,0 +1,61 @@
+---
+title: "DraftPicks"
+output: html_document
+date: "2023-03-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Data Prep
+set.seed(2)
+picks <- read.csv("draft-data-20-years.csv")
+firsts <- picks[picks$Pk < 31, ]
+nines <- firsts[firsts$DraftYear < 2000, ]
+zeros <- firsts[firsts$DraftYear > 1999  & firsts$DraftYear < 2010, ]
+tens <- firsts[firsts$DraftYear > 2009  & firsts$DraftYear < 2020, ]
+
+picked = sample(seq_len(nrow(nines)), size = 50)
+nineSample = nines[picked, ]
+
+picked = sample(seq_len(nrow(zeros)), size = 50)
+zeroSample = zeros[picked, ]
+
+picked = sample(seq_len(nrow(tens)), size = 50)
+tenSample = tens[picked, ]
+
+nineSample <- data.frame(nineSample$Player, nineSample$College, nineSample$DraftYr)
+zeroSample <- data.frame(zeroSample$Player, zeroSample$College, zeroSample$DraftYr)
+tenSample <- data.frame(tenSample$Player, tenSample$College, tenSample$DraftYr)
+write.csv(nineSample, 'nineSample.csv', row.names=FALSE)
+write.csv(zeroSample, 'zeroSample.csv', row.names=FALSE)
+write.csv(tenSample, 'tenSample.csv', row.names=FALSE)
+```
+
+```{r}
+# Proportion Tests
+nineClean <- read.csv('nineSample.csv')
+zeroClean <- read.csv('zeroSample.csv')
+tenClean <- read.csv('tenSample.csv')
+nineOProp <- nrow(nineClean[nineClean$Classification == 'O', ])/50
+zeroOProp <- nrow(zeroClean[zeroClean$Classification == 'O', ])/50
+tenOProp <- nrow(tenClean[tenClean$Classification == 'O', ])/50
+nineOCount <- nrow(nineClean[nineClean$Classification == 'O', ])
+zeroOCount <- nrow(zeroClean[zeroClean$Classification == 'O', ])
+tenOCount <- nrow(tenClean[tenClean$Classification == 'O', ])
+res <- prop.test(x = c(450, 400), n = c(500, 500))
+propTestTenZero <- prop.test(x = c(tenOCount, zeroOCount), n = c(50, 50), conf.level=0.95)
+propTestTenNine <- prop.test(x = c(tenOCount, nineOCount), n = c(50, 50), conf.level=0.95)
+propTestTenZero
+propTestTenNine
+```
+
+
+
+
+
+
+
+

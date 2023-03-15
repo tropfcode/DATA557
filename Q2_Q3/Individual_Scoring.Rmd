@@ -1,0 +1,242 @@
+---
+title: "Player Scoring"
+author: "Timothy Tan"
+date: "2023-03-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Collection
+
+```{r data pull}
+
+library(dplyr)
+## first season
+player_data <- read.csv(file = (paste('all_games_csv/season_',(1997),'_',1996,'.csv',sep='')))
+
+
+for(i in 1997:2022){
+  playDat <- read.csv(file = (paste('all_games_csv/season_',(i+1),'_',i,'.csv',sep='')))
+  player_data <- union(player_data,playDat)
+}
+
+write.csv(player_data, 'all_games_csv/All_Players.csv', row.names=FALSE)
+
+```
+
+## Data Processing and Filtering 
+
+```{r}
+
+library(ggplot2)
+
+player_data <- read.csv(file = 'all_games_csv/All_Players.csv')
+
+
+player_data$FG2A <- player_data$FGA - player_data$FG3A
+
+
+library(chron)
+player_data$PT30 <- ifelse(player_data$PTS >= 30, 1, 0)
+player_data$PT40 <- ifelse(player_data$PTS >= 40, 1, 0)
+player_data$PT50 <- ifelse(player_data$PTS >= 50, 1, 0)
+
+library(lubridate)
+
+
+pts <- player_data %>%
+  group_by(SEASON_YEAR) %>%
+  summarise(TotalGames = n(), PT30Games = sum(PT30), PT40Games = sum(PT40), PT50Games = sum(PT50)) 
+
+
+library(reshape2)
+pts.long <- melt(pts, id = "SEASON_YEAR", measure = c("PT30Games", "PT40Games", "PT50Games"))
+ggplot(pts.long, aes(SEASON_YEAR, value, colour = variable)) + geom_point() + scale_x_discrete(guide = guide_axis(n.dodge=3))+ggtitle("X Point Games Over Time") + xlab("Year") + ylab("X Point Games")
+
+ggplot(pts, aes(x=SEASON_YEAR, y=PT50Games)) + geom_point() +
+  stat_summary(aes(y = PT50Games,group=1), fun=mean, colour="blue", geom="line",group=1) + scale_x_discrete(guide = guide_axis(n.dodge=3)) + ggtitle("50+ Point Games Over Time") + xlab("Season") + ylab("50+ Point Games")
+
+
+ggplot(player_data, aes(x=year(GAME_DATE), y=PTS)) + geom_point() +
+  stat_summary(aes(y = PTS,group=1), fun.y=mean, colour="red", geom="line",group=1) + ggtitle("Points Over Time") + xlab("Year") + ylab("Points")
+
+ggplot(player_data, aes(x=year(GAME_DATE), y=PFD)) + geom_point() +
+  stat_summary(aes(y = PFD,group=1), fun.y=mean, colour="red", geom="line",group=1) + ggtitle("PFD Over Time") + xlab("Year") + ylab("PFD")
+
+ggplot(player_data, aes(x=SEASON_YEAR, y=PT30)) + geom_point() +
+  stat_summary(aes(y = PT30,group=1), fun.y=mean, colour="red", geom="line",group=1) + ggtitle("30+ Points Over Time") + xlab("Year") + ylab("Points")
+
+
+
+```
+
+```{r}
+
+linFit <- lm(PTS ~ MIN + FG2A + FG3A + FTA + OREB + DREB + AST + STL + BLK + TOV + PF, data = player_data)
+summary(linFit)
+a <- confint(linFit)
+a
+
+plot(linFit)
+
+logFit <- glm(PT40 ~ MIN + FG2A + FG3A + FTA + OREB + DREB+ AST + STL + BLK + TOV + PF, family = "binomial", data = player_data)
+summary(logFit)
+confint(logFit)
+
+vars <- c("Minutes", "2 PT Attempts", "3 PT Attempts", "Free Throw Attempts", "Offensive Rebounds", "Defensive Rebounds", "Assists", "Steals", "Blocks", "Turnovers", "Personal Fouls")
+
+test_stats <- c()
+pvals <- c()
+
+logFitRed1 <- glm(PT40 ~ FG2A + FG3A + FTA + OREB + DREB + AST + STL + BLK + TOV + PF, family = "binomial", data = player_data)
+test_stats <- c(test_stats, anova(logFit,logFitRed1, test = "LRT")[[4]][2])
+pvals <- c(pvals, anova(logFit,logFitRed1, test = "LRT")[[5]][2])
+
+logFitRed2 <- glm(PT40 ~ MIN + FG3A + FTA + OREB + DREB + AST + STL + BLK + TOV + PF, family = "binomial", data = player_data)
+test_stats <- c(test_stats, anova(logFit,logFitRed2, test = "LRT")[[4]][2])
+pvals <- c(pvals, anova(logFit,logFitRed2, test = "LRT")[[5]][2])
+
+logFitRed3 <- glm(PT40 ~ MIN + FG2A + FTA + OREB + DREB + AST + STL + BLK + TOV + PF, family = "binomial", data = player_data)
+test_stats <- c(test_stats, anova(logFit,logFitRed3, test = "LRT")[[4]][2])
+pvals <- c(pvals, anova(logFit,logFitRed3, test = "LRT")[[5]][2])
+
+logFitRed4 <- glm(PT40 ~ MIN + FG2A + FG3A + OREB + DREB + AST + STL + BLK + TOV + PF, family = "binomial", data = player_data)
+test_stats <- c(test_stats, anova(logFit,logFitRed4, test = "LRT")[[4]][2])
+pvals <- c(pvals, anova(logFit,logFitRed4, test = "LRT")[[5]][2])
+
+logFitRed5 <- glm(PT40 ~ MIN + FG2A + FG3A + FTA + DREB + AST + STL + BLK + TOV + PF, family = "binomial", data = player_data)
+test_stats <- c(test_stats, anova(logFit,logFitRed5, test = "LRT")[[4]][2])
+pvals <- c(pvals, anova(logFit,logFitRed5, test = "LRT")[[5]][2])
+
+logFitRed6 <- glm(PT40 ~ MIN + FG2A + FG3A + FTA + OREB + AST + STL + BLK + TOV + PF, family = "binomial", data = player_data)
+test_stats <- c(test_stats, anova(logFit,logFitRed6, test = "LRT")[[4]][2])
+pvals <- c(pvals, anova(logFit,logFitRed6, test = "LRT")[[5]][2])
+
+logFitRed7 <- glm(PT40 ~ MIN + FG2A + FG3A + FTA + OREB + DREB + STL + BLK + TOV + PF, family = "binomial", data = player_data)
+test_stats <- c(test_stats, anova(logFit,logFitRed7, test = "LRT")[[4]][2])
+pvals <- c(pvals, anova(logFit,logFitRed7, test = "LRT")[[5]][2])
+
+logFitRed8 <- glm(PT40 ~ MIN + FG2A + FG3A + FTA + OREB + DREB + AST + BLK + TOV + PF, family = "binomial", data = player_data)
+test_stats <- c(test_stats, anova(logFit,logFitRed8, test = "LRT")[[4]][2])
+pvals <- c(pvals, anova(logFit,logFitRed8, test = "LRT")[[5]][2])
+
+logFitRed9 <- glm(PT40 ~ MIN + FG2A + FG3A + FTA + OREB + DREB + AST + STL + TOV + PF, family = "binomial", data = player_data)
+test_stats <- c(test_stats, anova(logFit,logFitRed9, test = "LRT")[[4]][2])
+pvals <- c(pvals, anova(logFit,logFitRed9, test = "LRT")[[5]][2])
+
+logFitRed10 <- glm(PT40 ~ MIN + FG2A + FG3A + FTA + OREB + DREB + AST + STL + BLK + PF, family = "binomial", data = player_data)
+test_stats <- c(test_stats, anova(logFit,logFitRed10, test = "LRT")[[4]][2])
+pvals <- c(pvals, anova(logFit,logFitRed10, test = "LRT")[[5]][2])
+
+logFitRed11 <- glm(PT40 ~ MIN + FG2A + FG3A + FTA + OREB + DREB + AST + STL + BLK + TOV, family = "binomial", data = player_data)
+test_stats <- c(test_stats, anova(logFit,logFitRed11, test = "LRT")[[4]][2])
+pvals <- c(pvals, anova(logFit,logFitRed11, test = "LRT")[[5]][2])
+
+tab <- data.frame(vars,test_stats,pvals)
+tab
+```
+
+```{r}
+
+
+
+
+library(lmtest)
+library(sandwich)
+
+
+# linFitRed1 <- lm(PTS ~ FG2A + FG3A + FTA + OREB + DREB + AST + STL + BLK + TOV + PF, data = player_data)
+# waldtest(linFit, linFitRed1, test = "F")[[4]][2]
+# waldtest(linFit, linFitRed1, test = "F", vcov = vcovHC)[[4]][2]
+
+
+wald <- c()
+robustWald <- c()
+
+linFitRed1 <- lm(PTS ~ FG2A + FG3A + FTA + OREB + DREB + AST + STL + BLK + TOV + PF, data = player_data)
+wald <- c(wald, waldtest(linFit,linFitRed1, test = "F")[[4]][2])
+robustWald <- c(robustWald, waldtest(linFit,linFitRed1, test = "F", vcov = vcovHC)[[4]][2])
+
+linFitRed2 <- lm(PTS ~ MIN + FG3A + FTA + OREB + DREB + AST + STL + BLK + TOV + PF, data = player_data)
+wald <- c(wald, waldtest(linFit,linFitRed2, test = "F")[[4]][2])
+robustWald <- c(robustWald, waldtest(linFit,linFitRed2, test = "F", vcov = vcovHC)[[4]][2])
+
+linFitRed3 <- lm(PTS ~ MIN + FG2A + FTA + OREB + DREB + AST + STL + BLK + TOV + PF, data = player_data)
+wald <- c(wald, waldtest(linFit,linFitRed3, test = "F")[[4]][2])
+robustWald <- c(robustWald, waldtest(linFit,linFitRed3, test = "F", vcov = vcovHC)[[4]][2])
+
+linFitRed4 <- lm(PTS ~ MIN + FG2A + FG3A + OREB + DREB + AST + STL + BLK + TOV + PF, data = player_data)
+wald <- c(wald, waldtest(linFit,linFitRed4, test = "F")[[4]][2])
+robustWald <- c(robustWald, waldtest(linFit,linFitRed4, test = "F", vcov = vcovHC)[[4]][2])
+
+linFitRed5 <- lm(PTS ~ MIN + FG2A + FG3A + FTA + DREB + AST + STL + BLK + TOV + PF, data = player_data)
+wald <- c(wald, waldtest(linFit,linFitRed5, test = "F")[[4]][2])
+robustWald <- c(robustWald, waldtest(linFit,linFitRed5, test = "F", vcov = vcovHC)[[4]][2])
+
+linFitRed6 <- lm(PTS ~ MIN + FG2A + FG3A + FTA + OREB + AST + STL + BLK + TOV + PF, data = player_data)
+wald <- c(wald, waldtest(linFit,linFitRed6, test = "F")[[4]][2])
+robustWald <- c(robustWald, waldtest(linFit,linFitRed6, test = "F", vcov = vcovHC)[[4]][2])
+
+linFitRed7 <- lm(PTS ~ MIN + FG2A + FG3A + FTA + OREB + DREB + STL + BLK + TOV + PF, data = player_data)
+wald <- c(wald, waldtest(linFit,linFitRed7, test = "F")[[4]][2])
+robustWald <- c(robustWald, waldtest(linFit,linFitRed7, test = "F", vcov = vcovHC)[[4]][2])
+
+linFitRed8 <- lm(PTS ~ MIN + FG2A + FG3A + FTA + OREB + DREB + AST + BLK + TOV + PF, data = player_data)
+wald <- c(wald, waldtest(linFit,linFitRed8, test = "F")[[4]][2])
+robustWald <- c(robustWald, waldtest(linFit,linFitRed8, test = "F", vcov = vcovHC)[[4]][2])
+
+linFitRed9 <- lm(PTS ~ MIN + FG2A + FG3A + FTA + OREB + DREB + AST + STL + TOV + PF, data = player_data)
+wald <- c(wald, waldtest(linFit,linFitRed9, test = "F")[[4]][2])
+robustWald <- c(robustWald, waldtest(linFit,linFitRed9, test = "F", vcov = vcovHC)[[4]][2])
+
+linFitRed10 <- lm(PTS ~ MIN + FG2A + FG3A + FTA + OREB + DREB + AST + STL + BLK + PF, data = player_data)
+wald <- c(wald, waldtest(linFit,linFitRed10, test = "F")[[4]][2])
+robustWald <- c(robustWald, waldtest(linFit,linFitRed10, test = "F", vcov = vcovHC)[[4]][2])
+
+linFitRed11 <- lm(PTS ~ MIN + FG2A + FG3A + FTA + OREB + DREB + AST + STL + BLK + TOV, data = player_data)
+wald <- c(wald, waldtest(linFit,linFitRed11, test = "F")[[4]][2])
+robustWald <- c(robustWald, waldtest(linFit,linFitRed11, test = "F", vcov = vcovHC)[[4]][2])
+
+tabRobust <- data.frame(vars,wald,robustWald)
+tabRobust
+```
+
+
+
+```{r}
+
+ggplot(player_data, aes(x=year(GAME_DATE), y=FG3_PCT)) + geom_point() +
+  stat_summary(aes(y = FG3_PCT,group=1), fun=mean, colour="red", geom="line",group=1) + ggtitle("3 Point Percentage Over Time") + xlab("Year") + ylab("3 PT Pct")
+
+ggplot(player_data, aes(x=year(GAME_DATE), y=FG3A)) + geom_point() +
+  stat_summary(aes(y = FG3A,group=1), fun=mean, colour="red", geom="line",group=1) + ggtitle("3 Point Attempts Over Time") + xlab("Year") + ylab("3 PT Attempts")
+
+ggplot(player_data, aes(x=year(GAME_DATE), y=FG2A)) + geom_point() +
+  stat_summary(aes(y = FG2A,group=1), fun=mean, colour="red", geom="line",group=1) + ggtitle("2 Point Attemps Over Time") + xlab("Year") + ylab("2 PT Attempts")
+
+ggplot(player_data, aes(x=year(GAME_DATE), y=FGA)) + geom_point() +
+  stat_summary(aes(y = FGA,group=1), fun=mean, colour="red", geom="line",group=1) + ggtitle("Total Attemps Over Time") + xlab("Year") + ylab("Total Attempts")
+
+ggplot(player_data, aes(x=year(GAME_DATE), y=FTA)) + geom_point() +
+  stat_summary(aes(y = FTA,group=1), fun=mean, colour="red", geom="line",group=1) + ggtitle("Free Throw Attemps Over Time") + xlab("Year") + ylab("Free Throw Attempts")
+
+ggplot(player_data, aes(x=year(GAME_DATE), y=OREB)) + geom_point() +
+  stat_summary(aes(y = OREB,group=1), fun=mean, colour="red", geom="line",group=1) + ggtitle("Offensive Rebounds Over Time") + xlab("Year") + ylab("Offensive Rebounds")
+
+ggplot(player_data, aes(x=OREB, y=FG3A)) + geom_point() +
+  stat_summary(aes(y = FG3A,group=1), fun=mean, colour="red", geom="line",group=1) + ggtitle("3PTA vs OREB") + xlab("Offensive Rebounds") + ylab("3 PT Attempts")
+
+ggplot(player_data, aes(x=year(GAME_DATE), y=PF)) + geom_point() +
+  stat_summary(aes(y = PF,group=1), fun=mean, colour="red", geom="line",group=1) + ggtitle("Personal Fouls Over Time") + xlab("Year") + ylab("Personal Fouls")
+
+ggplot(player_data, aes(x=year(GAME_DATE), y=FG_PCT)) + geom_point() +
+  stat_summary(aes(y = FG_PCT,group=1), fun=mean, colour="red", geom="line",group=1) + ggtitle("FG Percent Over Time") + xlab("Year") + ylab("FG Percent")
+
+ggplot(player_data, aes(x=year(GAME_DATE), y=BLK)) + geom_point() +
+  stat_summary(aes(y = BLK,group=1), fun=mean, colour="red", geom="line",group=1) + ggtitle("Blocks Over Time") + xlab("Year") + ylab("Blocks")
+
+```
+

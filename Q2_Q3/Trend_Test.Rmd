@@ -1,0 +1,43 @@
+---
+title: "Trend Test"
+author: "Timothy Tan"
+date: "2023-03-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data
+
+```{r data}
+
+draft90 <- read.csv(file = 'Draft/nineSample.csv')
+draft00 <- read.csv(file = 'Draft/zeroSample.csv')
+draft10 <- read.csv(file = 'Draft/tenSample.csv')
+
+library(dplyr)
+
+draft90$Decade = '90s'
+draft00$Decade = '00s'
+draft10$Decade = '10s'
+
+draftSample <- union(union(draft90,draft00),draft10)
+ 
+draftSample$Decade <- factor(draftSample$Decade, levels = c("90s", "00s", "10s")) 
+
+
+```
+
+```{r trend_test}
+
+draftMatrix <- table(draftSample$Decade, draftSample$Classification)
+
+library(DescTools)
+
+mat
+CochranArmitageTest(draftMatrix, alternative = c("two.sided", "one.sided"))
+  
+
+```

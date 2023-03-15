@@ -1,0 +1,120 @@
+---
+title: "NBA Team Scoring"
+author: "Timothy Tan"
+date: "2023-03-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Collection
+
+```{r data pull}
+
+library(nbastatR)
+library(dplyr)
+Sys.setenv("VROOM_CONNECTION_SIZE"=131072*2)
+teams <- nba_teams(league = "NBA", join_blg = F)
+NBAteams <- teams$slugTeam[50:79]
+
+## first team
+team_data <- read.csv(file = (paste('final_project_data_557/', NBAteams[1],'.csv',sep='')))
+
+for(i in 2:30){
+  teamDat <- read.csv(file = (paste('final_project_data_557/', NBAteams[i],'.csv',sep='')))
+  team_data <- union(team_data,teamDat)
+}
+
+write.csv(team_data, 'final_project_data_557/All_Teams.csv', row.names=FALSE)
+
+```
+
+## AIC/BIC
+
+```{r AIC/BIC}
+team_data <- read.csv(file = 'final_project_data_557/All_Teams.csv')
+team_data$GAME_DATE <- as.Date(team_data$GAME_DATE)
+team_data$FG2A <- team_data$FGA-team_data$FG3A
+team_data_30 <- team_data[team_data$GAME_DATE > '1996-10-31',]
+team_data_30 <- team_data_30[months(team_data_30$GAME_DATE) %in% month.name[c(11,12,1,2,3)],]
+drop <- c(1,2,3,4,5,6,7,8,9,10,12,14,15,17,18,20,23)
+red_table <- subset(team_data_30, select = -drop)
+red_table <- na.exclude(red_table)
+```
+
+```{r}
+library(ggplot2)
+library(lubridate)
+
+ggplot(team_data_30, aes(x=year(GAME_DATE), y=PTS)) + geom_point() +
+  stat_summary(aes(y = PTS,group=1), fun.y=mean, colour="red", geom="line",group=1) + ggtitle("Points Over Time") + xlab("Year") + ylab("Points")
+
+ggplot(team_data_30, aes(x=FG3A, y=PTS)) + geom_point() +
+  stat_summary(aes(y = PTS,group=1), fun.y=mean, colour="red", geom="line",group=1) + ggtitle("Total Points vs. 3 Point Attempts") + ylab("Total Points") + xlab("3 PT Attempts")
+
+ggplot(team_data_30, aes(x=year(GAME_DATE), y=FG3_PCT)) + geom_point() +
+  stat_summary(aes(y = FG3_PCT,group=1), fun.y=mean, colour="red", geom="line",group=1) + ggtitle("3 Point Percentage Over Time") + xlab("Year") + ylab("3 PT Pct")
+
+ggplot(team_data_30, aes(x=year(GAME_DATE), y=FGA)) + geom_point() +
+  stat_summary(aes(y = FGA,group=1), fun.y=mean, colour="red", geom="line",group=1) + ggtitle("Total FG Attempts Over Time") + xlab("Year") + ylab("Total Attempts")
+
+ggplot(team_data_30, aes(x=year(GAME_DATE), y=FG2A)) + geom_point() +
+  stat_summary(aes(y = FG2A,group=1), fun.y=mean, colour="red", geom="line",group=1) + ggtitle("2 Point Attemps Over Time") + xlab("Year") + ylab("2 PT Attempts")
+
+ggplot(team_data_30, aes(x=year(GAME_DATE), y=OREB)) + geom_point() +
+  stat_summary(aes(y = OREB,group=1), fun.y=mean, colour="red", geom="line",group=1) + ggtitle("Offensive Rebounds Over Time") + xlab("Year") + ylab("Offensive Rebounds")
+
+ggplot(team_data_30, aes(x=year(GAME_DATE), y=PF)) + geom_point() +
+  stat_summary(aes(y = PF,group=1), fun.y=mean, colour="red", geom="line",group=1) + ggtitle("Personal Fouls Over Time") + xlab("Year") + ylab("Personal Fouls")
+
+ggplot(team_data_30, aes(x=year(GAME_DATE), y=FG_PCT)) + geom_point() +
+  stat_summary(aes(y = FG_PCT,group=1), fun.y=mean, colour="red", geom="line",group=1) + ggtitle("FG Percent Over Time") + xlab("Year") + ylab("FG Percent")
+
+ggplot(team_data_30, aes(x=year(GAME_DATE), y=BLK)) + geom_point() +
+  stat_summary(aes(y = BLK,group=1), fun.y=mean, colour="red", geom="line",group=1) + ggtitle("Blocks Over Time") + xlab("Year") + ylab("Blocks")
+
+# plot(x=team_data_30$GAME_DATE, y = team_data_30$FGA)
+# plot(x=team_data_30$GAME_DATE, y = team_data_30$FG3A)
+# plot(x=team_data_30$GAME_DATE, y = team_data_30$FTA)
+# plot(x=team_data_30$GAME_DATE, y = team_data_30$DREB)
+# plot(x=team_data_30$GAME_DATE, y = team_data_30$AST)
+# plot(x=team_data_30$GAME_DATE, y = team_data_30$TOV)
+
+```
+
+
+```{r}
+library(tidyverse)
+library(caret)
+library(leaps)
+
+library(MASS)
+# Fit the full model 
+fitFull <- lm(PTS ~ . -FGA-PLUS_MINUS-AST, data = red_table)
+summary(fitFull)
+plot(fitFull)
+confint(fitFull)
+```
+
+```{r}
+set.seed(1)
+# Set up repeated k-fold cross-validation
+train.control <- trainControl(method = "cv", number = 10)
+# Train the model
+step.model <- train(PTS ~., data = red_table,
+                    method = "leapForward",
+                    tuneGrid = data.frame(nvmax = 1:5),
+                    trControl = train.control
+                    )
+step.model$results
+summary(step.model$finalModel)
+
+```
+
+
+
+
+
+
